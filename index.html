@@ -273,6 +273,32 @@
         </div>
     </div>
 
+    <!-- FULL PHOTO & CARE DETAILS PREVIEW MODAL -->
+    <div id="photoPreviewModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-50 hidden flex items-center justify-center p-4 overflow-y-auto" onclick="closePhotoPreviewModal()">
+        <div class="bg-white rounded-3xl max-w-3xl w-full overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200 my-8" onclick="event.stopPropagation()">
+            <div class="relative bg-slate-950 flex items-center justify-center min-h-[300px] max-h-[60vh]">
+                <img id="modalPreviewImage" src="" alt="Plant Photo" class="max-h-[60vh] w-auto object-contain">
+                <button onclick="closePhotoPreviewModal()" class="absolute top-4 right-4 bg-slate-900/60 hover:bg-slate-900 text-white w-9 h-9 rounded-full flex items-center justify-center backdrop-blur-md transition">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div class="flex flex-wrap items-start justify-between gap-2 border-b border-slate-100 pb-3">
+                    <div>
+                        <h2 id="modalPlantTitle" class="text-2xl font-bold text-slate-900"></h2>
+                        <p id="modalPlantSubtitle" class="text-xs text-slate-500 italic"></p>
+                    </div>
+                    <div id="modalPlantStatusBadge"></div>
+                </div>
+
+                <div>
+                    <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Care Instructions & Notes</h4>
+                    <p id="modalPlantCareNotes" class="text-sm text-slate-700 bg-emerald-50/60 border border-emerald-100 rounded-2xl p-4 leading-relaxed"></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast Notification -->
     <div id="toast" class="fixed bottom-5 right-5 bg-slate-900 text-white text-xs font-semibold px-4 py-3 rounded-2xl shadow-xl transition-all duration-300 opacity-0 pointer-events-none translate-y-4 z-50 flex items-center space-x-2">
         <i class="fa-solid fa-circle-check text-emerald-400"></i>
@@ -447,22 +473,39 @@
                 const statusBadge = getStatusBadgeHTML(plant.status);
 
                 return `
-                    <div class="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition flex flex-col">
-                        <div class="relative h-48 bg-slate-100 overflow-hidden">
-                            <img src="${latestPhoto}" alt="${plant.name}" class="w-full h-full object-cover">
-                            <div class="absolute top-3 right-3">
+                    <div class="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition flex flex-col group">
+                        <div class="relative h-52 bg-slate-100 overflow-hidden cursor-pointer" onclick="openPhotoPreviewModal('${plant.id}')">
+                            <img src="${latestPhoto}" alt="${plant.name}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
+                            <div class="absolute inset-0 bg-slate-900/10 group-hover:bg-slate-900/20 transition flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                <span class="bg-white/90 text-slate-800 text-xs font-semibold px-3 py-1.5 rounded-xl backdrop-blur-sm shadow">
+                                    <i class="fa-solid fa-expand mr-1"></i> Expand Photo & Care
+                                </span>
+                            </div>
+                            <div class="absolute top-3 right-3 flex items-center space-x-1.5">
                                 ${statusBadge}
+                                <button onclick="event.stopPropagation(); deletePlant('${plant.id}')" title="Delete Plant" class="bg-white/80 hover:bg-red-500 hover:text-white text-slate-600 text-xs w-7 h-7 rounded-full flex items-center justify-center backdrop-blur-sm transition shadow-sm">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
                             </div>
                         </div>
-                        <div class="p-4 flex-1 flex flex-col justify-between">
+                        <div class="p-4 flex-1 flex flex-col justify-between space-y-3">
                             <div>
-                                <h3 class="text-base font-bold text-slate-900 leading-tight">${plant.name}</h3>
-                                <p class="text-xs text-slate-400 italic">${plant.scientificName || 'Species unspecified'}</p>
-                                ${latestLog && latestLog.height ? `<p class="text-xs font-semibold text-emerald-600 mt-2"><i class="fa-solid fa-ruler-vertical mr-1"></i> Height: ${latestLog.height}</p>` : ''}
-                                ${plant.notes ? `<p class="text-xs text-slate-600 mt-2 line-clamp-2">${plant.notes}</p>` : ''}
+                                <div class="flex items-start justify-between">
+                                    <div>
+                                        <h3 class="text-base font-bold text-slate-900 leading-tight">${plant.name}</h3>
+                                        <p class="text-xs text-slate-400 italic">${plant.scientificName || 'Species unspecified'}</p>
+                                    </div>
+                                    ${latestLog && latestLog.height ? `<span class="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100"><i class="fa-solid fa-ruler-vertical mr-1"></i>${latestLog.height}</span>` : ''}
+                                </div>
+                                ${plant.notes ? `
+                                    <div class="mt-2.5 bg-slate-50 border border-slate-100 p-2.5 rounded-xl">
+                                        <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-0.5"><i class="fa-solid fa-seedling text-emerald-600 mr-1"></i>Care Tips</p>
+                                        <p class="text-xs text-slate-600 line-clamp-3">${plant.notes}</p>
+                                    </div>
+                                ` : ''}
                             </div>
 
-                            <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+                            <div class="pt-3 border-t border-slate-100 flex items-center justify-between">
                                 <button onclick="openHistoryModal('${plant.id}')" class="text-xs font-semibold text-slate-600 hover:text-emerald-600 flex items-center space-x-1">
                                     <i class="fa-solid fa-clock-rotate-left"></i>
                                     <span>History (${plant.logs ? plant.logs.length : 0})</span>
@@ -794,12 +837,19 @@
             const sortedLogs = [...(plant.logs || [])].reverse();
 
             timeline.innerHTML = sortedLogs.map(log => `
-                <div class="flex space-x-4">
-                    <img src="${log.photo || DEFAULT_PLANT_IMAGE}" class="w-20 h-20 rounded-2xl object-cover border border-slate-200 shrink-0">
-                    <div>
-                        <div class="flex items-center space-x-2">
+                <div class="flex space-x-4 items-start p-2 rounded-2xl hover:bg-slate-50 transition relative group">
+                    <img src="${log.photo || DEFAULT_PLANT_IMAGE}" class="w-20 h-20 rounded-2xl object-cover border border-slate-200 shrink-0 cursor-pointer" onclick="openPhotoPreviewModal('${plant.id}')">
+                    <div class="flex-1">
+                        <div class="flex items-center justify-between">
                             <span class="text-xs font-bold text-slate-900">${new Date(log.date).toLocaleDateString()}</span>
-                            ${getStatusBadgeHTML(log.status)}
+                            <div class="flex items-center space-x-2">
+                                ${getStatusBadgeHTML(log.status)}
+                                ${plant.logs.length > 1 ? `
+                                    <button onclick="deleteLogPhoto('${plant.id}', '${log.id}')" title="Delete Photo Log" class="text-slate-400 hover:text-red-500 text-xs p-1">
+                                        <i class="fa-solid fa-trash"></i>
+                                    </button>
+                                ` : ''}
+                            </div>
                         </div>
                         ${log.height ? `<p class="text-xs font-semibold text-emerald-600 mt-1">Height: ${log.height}</p>` : ''}
                         <p class="text-xs text-slate-600 mt-1">${log.notes || ''}</p>
@@ -812,6 +862,49 @@
 
         function closeHistoryModal() {
             document.getElementById('historyModal').classList.add('hidden');
+        }
+
+        function openPhotoPreviewModal(plantId) {
+            const plant = plantsData.find(p => p.id === plantId);
+            if (!plant) return;
+
+            const latestLog = plant.logs && plant.logs.length > 0 ? plant.logs[plant.logs.length - 1] : null;
+            const latestPhoto = latestLog && latestLog.photo ? latestLog.photo : (plant.coverPhoto || DEFAULT_PLANT_IMAGE);
+
+            document.getElementById('modalPreviewImage').src = latestPhoto;
+            document.getElementById('modalPlantTitle').textContent = plant.name;
+            document.getElementById('modalPlantSubtitle').textContent = plant.scientificName || 'Species unspecified';
+            document.getElementById('modalPlantStatusBadge').innerHTML = getStatusBadgeHTML(plant.status);
+            document.getElementById('modalPlantCareNotes').textContent = plant.notes || 'No specific care instructions recorded for this plant yet.';
+
+            document.getElementById('photoPreviewModal').classList.remove('hidden');
+        }
+
+        function closePhotoPreviewModal() {
+            document.getElementById('photoPreviewModal').classList.add('hidden');
+        }
+
+        function deletePlant(plantId) {
+            const plant = plantsData.find(p => p.id === plantId);
+            if (!plant) return;
+
+            if (confirm(`Are you sure you want to delete "${plant.name}" and all its photo history?`)) {
+                plantsData = plantsData.filter(p => p.id !== plantId);
+                savePlantsData();
+                showToast("Plant removed from garden.");
+            }
+        }
+
+        function deleteLogPhoto(plantId, logId) {
+            const plant = plantsData.find(p => p.id === plantId);
+            if (!plant || !plant.logs) return;
+
+            if (confirm("Delete this photo entry from history?")) {
+                plant.logs = plant.logs.filter(l => l.id !== logId);
+                savePlantsData();
+                openHistoryModal(plantId);
+                showToast("Photo entry deleted.");
+            }
         }
 
         function openSyncModal() {
