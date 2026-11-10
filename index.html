@@ -279,6 +279,81 @@
         <span id="toastMessage">Action saved!</span>
     </div>
 
+    <!-- Firebase Imports and Cloud Sync Logic -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'sprouttrack-app';
+        let db = null;
+        let auth = null;
+        let unsubscribeSync = null;
+
+        // Initialize Firebase Cloud Data Sync
+        async function initFirebaseSync() {
+            try {
+                if (typeof __firebase_config === 'undefined' || !__firebase_config) return;
+                const firebaseConfig = JSON.parse(__firebase_config);
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                setupRealtimeCloudListener();
+            } catch (err) {
+                console.warn("Cloud sync initialized in local-only mode:", err);
+            }
+        }
+
+        window.setupRealtimeCloudListener = function() {
+            if (!db) return;
+            const currentSyncCode = window.gardenSyncId || localStorage.getItem('sprout_garden_code');
+            if (!currentSyncCode) return;
+
+            if (unsubscribeSync) unsubscribeSync();
+
+            // Firestore Path complying with Rule 1
+            const gardenRef = doc(db, 'artifacts', appId, 'public', 'data', 'gardens', currentSyncCode);
+
+            unsubscribeSync = onSnapshot(gardenRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    const cloudData = docSnap.data();
+                    if (cloudData && Array.isArray(cloudData.plants)) {
+                        window.plantsData = cloudData.plants;
+                        localStorage.setItem(`sprout_plants_${currentSyncCode}`, JSON.stringify(window.plantsData));
+                        if (window.renderApp) window.renderApp();
+                    }
+                }
+            }, (error) => {
+                console.error("Cloud listener error:", error);
+            });
+        };
+
+        window.pushPlantsToCloud = async function() {
+            if (!db) return;
+            const currentSyncCode = window.gardenSyncId || localStorage.getItem('sprout_garden_code');
+            if (!currentSyncCode) return;
+
+            try {
+                const gardenRef = doc(db, 'artifacts', appId, 'public', 'data', 'gardens', currentSyncCode);
+                await setDoc(gardenRef, {
+                    updatedAt: new Date().toISOString(),
+                    plants: window.plantsData
+                }, { merge: true });
+            } catch (err) {
+                console.error("Failed to push to cloud:", err);
+            }
+        };
+
+        initFirebaseSync();
+    </script>
+
     <!-- JavaScript Application Logic -->
     <script>
         // State Management
@@ -312,6 +387,7 @@
 
         function savePlantsData() {
             localStorage.setItem(`sprout_plants_${gardenSyncId}`, JSON.stringify(plantsData));
+            if (window.pushPlantsToCloud) window.pushPlantsToCloud();
             renderApp();
         }
 
@@ -743,7 +819,46 @@
             const savedKey = localStorage.getItem('gemini_api_key') || '';
             const keyInput = document.getElementById('geminiApiKeyInput');
             if (keyInput) keyInput.value = savedKey;
+            
+            // Render Connect Garden Code Input
+            const modalContainer = document.querySelector('#syncModal .space-y-4');
+            if (modalContainer && !document.getElementById('connectGardenBox')) {
+                const connectBox = document.createElement('div');
+                connectBox.id = 'connectGardenBox';
+                connectBox.className = 'bg-emerald-50 p-4 rounded-2xl border border-emerald-200 mt-3';
+                connectBox.innerHTML = `
+                    <label class="block text-xs font-bold uppercase tracking-wider text-emerald-900 mb-1.5">
+                        <i class="fa-solid fa-link mr-1"></i> Connect to Phone / Existing Garden
+                    </label>
+                    <div class="flex space-x-2">
+                        <input type="text" id="connectSyncCodeInput" placeholder="Enter GARDEN-XXXXXX" class="flex-1 bg-white border border-emerald-300 rounded-xl p-2.5 text-xs font-mono uppercase focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500">
+                        <button onclick="connectExistingGardenCode()" class="bg-emerald-600 text-white font-medium text-xs px-3.5 py-2.5 rounded-xl hover:bg-emerald-700 transition shadow-sm">
+                            Connect
+                        </button>
+                    </div>
+                `;
+                modalContainer.insertBefore(connectBox, modalContainer.children[2]);
+            }
+            
             document.getElementById('syncModal').classList.remove('hidden');
+        }
+
+        function connectExistingGardenCode() {
+            const input = document.getElementById('connectSyncCodeInput');
+            if (!input) return;
+            const newCode = input.value.trim().toUpperCase();
+            if (!newCode.startsWith('GARDEN-')) {
+                showToast("Garden code must start with GARDEN-");
+                return;
+            }
+
+            gardenSyncId = newCode;
+            localStorage.setItem('sprout_garden_code', gardenSyncId);
+            document.getElementById('syncCodeValue').textContent = gardenSyncId;
+            loadPlantsData();
+            if (window.setupRealtimeCloudListener) window.setupRealtimeCloudListener();
+            renderApp();
+            showToast("Connected to Garden Sync Code!");
         }
 
         function closeSyncModal() {
